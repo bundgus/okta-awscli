@@ -10,11 +10,13 @@ try:
 except NameError:
     pass
 
+
 class OktaAuthConfig():
     """ Config helper class """
     def __init__(self, logger):
         self.logger = logger
-        self.config_path = os.path.expanduser('~') + '/.okta-aws'
+        self.config_path = os.path.join(os.getcwd(), '.okta-aws')
+        print(self.config_path)
         self._value = RawConfigParser()
         self._value.read(self.config_path)
 

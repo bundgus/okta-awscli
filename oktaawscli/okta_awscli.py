@@ -1,13 +1,12 @@
 """ Wrapper script for awscli which handles Okta auth """
-# pylint: disable=C0325,R0913,R0914
 import os
 from subprocess import call
 import logging
-import click
 from oktaawscli.version import __version__
 from oktaawscli.okta_auth import OktaAuth
 from oktaawscli.okta_auth_config import OktaAuthConfig
 from oktaawscli.aws_auth import AwsAuth
+
 
 def get_credentials(aws_auth, okta_profile, profile,
                     verbose, logger, totp_token, cache):
@@ -37,49 +36,32 @@ def get_credentials(aws_auth, okta_profile, profile,
     logger.info("Session token expires on: %s" % session_token_expiry)
     if not profile:
         exports = console_output(access_key_id, secret_access_key,
-                                 session_token, verbose)
+                                 session_token, session_token_expiry, verbose)
         if cache:
-            cache = open("%s/.okta-credentials.cache" %
-                         (os.path.expanduser('~'),), 'w')
+            cache = open(os.path.join(os.getcwd(), 'aws_credentials.config'), 'w')
             cache.write(exports)
             cache.close()
-        exit(0)
     else:
         aws_auth.write_sts_token(profile, access_key_id,
                                  secret_access_key, session_token)
+    return access_key_id, secret_access_key, session_token, session_token_expiry
 
 
-def console_output(access_key_id, secret_access_key, session_token, verbose):
+def console_output(access_key_id, secret_access_key, session_token, session_token_expiry, verbose):
     """ Outputs STS credentials to console """
     if verbose:
         print("Use these to set your environment variables:")
     exports = "\n".join([
-        "export AWS_ACCESS_KEY_ID=%s" % access_key_id,
-        "export AWS_SECRET_ACCESS_KEY=%s" % secret_access_key,
-        "export AWS_SESSION_TOKEN=%s" % session_token
+        "[default]",
+        "aws_access_key_id=%s" % access_key_id,
+        "aws_secret_access_key=%s" % secret_access_key,
+        "aws_session_token=%s" % session_token,
+        "session_token_expiry=%s" % session_token_expiry
     ])
-    print(exports)
 
     return exports
 
 
-# pylint: disable=R0913
-@click.command()
-@click.option('-v', '--verbose', is_flag=True, help='Enables verbose mode')
-@click.option('-V', '--version', is_flag=True,
-              help='Outputs version number and exits')
-@click.option('-d', '--debug', is_flag=True, help='Enables debug mode')
-@click.option('-f', '--force', is_flag=True, help='Forces new STS credentials. \
-Skips STS credentials validation.')
-@click.option('--okta-profile', help="Name of the profile to use in .okta-aws. \
-If none is provided, then the default profile will be used.\n")
-@click.option('--profile', help="Name of the profile to store temporary \
-credentials in ~/.aws/credentials. If profile doesn't exist, it will be \
-created. If omitted, credentials will output to console.\n")
-@click.option('-c', '--cache', is_flag=True, help='Cache the default profile credentials \
-to ~/.okta-credentials.cache\n')
-@click.option('-t', '--token', help='TOTP token from your authenticator app')
-@click.argument('awscli_args', nargs=-1, type=click.UNPROCESSED)
 def main(okta_profile, profile, verbose, version,
          debug, force, cache, awscli_args, token):
     """ Authenticate to awscli using Okta """
@@ -109,7 +91,7 @@ def main(okta_profile, profile, verbose, version,
         elif force:
             logger.info("Force option selected, but no profile provided. \
                 Option has no effect.")
-        get_credentials(
+        return get_credentials(
             aws_auth, okta_profile, profile, verbose, logger, token, cache
         )
 

@@ -9,11 +9,12 @@ import boto3
 from botocore.exceptions import ClientError
 
 
-class AwsAuth():
+class AwsAuth:
     """ Methods to support AWS authentication using STS """
 
     def __init__(self, profile, okta_profile, verbose, logger):
-        home_dir = os.path.expanduser('~')
+        # home_dir = os.path.expanduser('~')
+        home_dir = os.getcwd()
         self.creds_dir = home_dir + "/.aws"
         self.creds_file = self.creds_dir + "/credentials"
         self.profile = profile
@@ -28,7 +29,6 @@ class AwsAuth():
         if parser.has_option(okta_profile, 'role'):
             self.role = parser.get(okta_profile, 'role')
             self.logger.debug("Setting AWS role to %s" % self.role)
-
 
     def choose_aws_role(self, assertion):
         """ Choose AWS role from SAML assertion """
