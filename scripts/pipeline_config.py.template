@@ -7,6 +7,10 @@ cert_config_v1_4 = {
     'hdfs_user': 'sg123456',
     's3_luigi_status_location': 'path/to/s3/folder/',
     's3_extract_landing_location': 'path/to/s3/folder/',
+    'filename_summary': 'PROJECT_{0}_{1}_{2}_{3}.txt',
+    'filename_request': 'PROJECT_{0}_{1}_{2}_{3}_request.txt.gz',
+    'filename_response': 'PROJECT_{0}_{1}_{2}_{3}_response.txt.gz',
+    'subscriber_codes': ['A', 'B', 'C']
 }
 
 prod_config_v1_4 = {
@@ -18,4 +22,8 @@ prod_config_v1_4 = {
     'hdfs_user': 'sg123456',
     's3_luigi_status_location': 'path/to/s3/folder/',
     's3_extract_landing_location': 'path/to/s3/folder/',
+    'filename_summary': 'Shopping_MIDT_{0}_{1}_{2}_{3}.txt',
+    'filename_request': 'Shopping_MIDT_{0}_{1}_{2}_{3}_request.txt.gz',
+    'filename_response': 'Shopping_MIDT_{0}_{1}_{2}_{3}_response.txt.gz',
+    'subscriber_codes': ['A', 'B', 'C']
 }
