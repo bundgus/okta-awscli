@@ -1,5 +1,9 @@
+python-dateutil # no conda package, must use pip
 requests
 click
 beautifulsoup4
 boto3
 ConfigParser
+hdfs # no conda package, must use pip
+luigi
+s3fs
