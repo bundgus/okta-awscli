@@ -1,0 +1,21 @@
+cert_config_v1_4 = {
+    'env_name': 'CERT',
+    'version': '1.4',
+    'hadoop_user': 'sg123456',
+    'hdfs_server': 'http://server.domain.com:14000',
+    'hdfs_extract_directory': '/data/data_location/',
+    'hdfs_user': 'sg123456',
+    's3_luigi_status_location': 'path/to/s3/folder/',
+    's3_extract_landing_location': 'path/to/s3/folder/',
+}
+
+prod_config_v1_4 = {
+    'env_name': 'PROD',
+    'version': '1.4',
+    'hadoop_user': 'sg123456',
+    'hdfs_server': 'http://server.domain.com:14000',
+    'hdfs_extract_directory': '/data/data_location/',
+    'hdfs_user': 'sg123456',
+    's3_luigi_status_location': 'path/to/s3/folder/',
+    's3_extract_landing_location': 'path/to/s3/folder/',
+}
