@@ -1,0 +1,14 @@
+import os
+
+os.environ['http_proxy'] = "http://sg000000:YOUR_PASSWORD@www-ad-proxy.sabre.com:80/"
+os.environ['https_proxy'] = "http://sg000000:YOUR_PASSWORD@www-ad-proxy.sabre.com:80/"
+
+prod_config = {
+    'env_name': 'PROD',
+    'hdfs_user': 'sg000000',
+    'hdfs_server': 'http://httpfs-prod.sabre.com:14000',
+    'hdfs_response_file_path': '/db/core/airshopping/shopresponselite/year={0}/month={1}/day={2}/hour={3}/{4}',
+    's3_luigi_status_location': 's3-tn-dev-tnpai-shopping/rami/luigi_status/prod/hdfs_to_s3/',
+    's3_response_file_path': '/s3-tn-dev-tnpai-shopping/v14_prod/source/shopresponselite'
+                             '/year={0}/month={1}/day={2}/hour={3}/{4}'
+}

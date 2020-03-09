@@ -1,0 +1,8 @@
+[default]
+base-url = domain.okta.com
+username = sg0xxxxxx@Global.ad.sabre.com
+password = password
+factor = GOOGLE # Current choices are: GOOGLE or OKTA
+role = arn:aws:iam::123456789012:role/RoleName
+app-link = https://sabre.okta.com/home/amazon_aws/0aaaaaaaaaaa/999
+duration = 14400
