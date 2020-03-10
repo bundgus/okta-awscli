@@ -127,65 +127,65 @@ class DownloadOneFileFromHDFSRequest(TaskTemplate):
         self.mark_complete()
 
 
-class UploadOneFiletoS3Request(TaskTemplate):
-    resources = {'s3': 1}
-
-    def get_s3_file_path(self):
-        s3_file_path = self.env_config['s3_response_file_path'].format(self.year,
-                                                                       self.month,
-                                                                       self.day,
-                                                                       self.hour,
-                                                                       self.filename)
-        return s3_file_path
-
-    def requires(self):
-        s3_file_path = self.get_s3_file_path()
-        log.info(f'checking for existing file on s3: {s3_file_path}')
-        s3 = self.get_s3fs()
-        if not s3.exists(s3_file_path):
-            return DownloadOneFileFromHDFSRequest(env_config=self.env_config,
-                                                  year=self.year,
-                                                  month=self.month,
-                                                  day=self.day,
-                                                  hour=self.hour,
-                                                  filename=self.filename
-                                                  )
-        else:
-            log.warning(f'file already exists on s3 - skipping download for {s3_file_path}')
-            return None
-
-    @log_timer
-    def run(self):
-        local_directory = 'data'
-        s3_file_path = self.get_s3_file_path()
-        log.info(f'uploading file to s3: {s3_file_path}')
-        s3 = self.get_s3fs()
-        if not s3.exists(s3_file_path):
-            s3.put(os.path.join(local_directory, self.filename), s3_file_path)
-        else:
-            log.warning(f'file already exists on s3 - skipping upload for {s3_file_path}')
-        self.mark_complete()
-
-
-class DeleteLocalFileRequest(TaskTemplate):
-
-    def requires(self):
-        return UploadOneFiletoS3Request(env_config=self.env_config,
-                                        year=self.year,
-                                        month=self.month,
-                                        day=self.day,
-                                        hour=self.hour,
-                                        filename=self.filename,
-                                        )
-
-    def run(self):
-        local_file_path = os.path.join('data', self.filename)
-        log.info('deleting local file: ' + local_file_path)
-        try:
-            os.remove(local_file_path)
-        except FileNotFoundError as e:
-            log.warning(e)
-        self.mark_complete()
+# class UploadOneFiletoS3Request(TaskTemplate):
+#     resources = {'s3': 1}
+#
+#     def get_s3_file_path(self):
+#         s3_file_path = self.env_config['s3_response_file_path'].format(self.year,
+#                                                                        self.month,
+#                                                                        self.day,
+#                                                                        self.hour,
+#                                                                        self.filename)
+#         return s3_file_path
+#
+#     def requires(self):
+#         s3_file_path = self.get_s3_file_path()
+#         log.info(f'checking for existing file on s3: {s3_file_path}')
+#         s3 = self.get_s3fs()
+#         if not s3.exists(s3_file_path):
+#             return DownloadOneFileFromHDFSRequest(env_config=self.env_config,
+#                                                   year=self.year,
+#                                                   month=self.month,
+#                                                   day=self.day,
+#                                                   hour=self.hour,
+#                                                   filename=self.filename
+#                                                   )
+#         else:
+#             log.warning(f'file already exists on s3 - skipping download for {s3_file_path}')
+#             return None
+#
+#     @log_timer
+#     def run(self):
+#         local_directory = 'data'
+#         s3_file_path = self.get_s3_file_path()
+#         log.info(f'uploading file to s3: {s3_file_path}')
+#         s3 = self.get_s3fs()
+#         if not s3.exists(s3_file_path):
+#             s3.put(os.path.join(local_directory, self.filename), s3_file_path)
+#         else:
+#             log.warning(f'file already exists on s3 - skipping upload for {s3_file_path}')
+#         self.mark_complete()
+#
+#
+# class DeleteLocalFileRequest(TaskTemplate):
+#
+#     def requires(self):
+#         return UploadOneFiletoS3Request(env_config=self.env_config,
+#                                         year=self.year,
+#                                         month=self.month,
+#                                         day=self.day,
+#                                         hour=self.hour,
+#                                         filename=self.filename,
+#                                         )
+#
+#     def run(self):
+#         local_file_path = os.path.join('data', self.filename)
+#         log.info('deleting local file: ' + local_file_path)
+#         try:
+#             os.remove(local_file_path)
+#         except FileNotFoundError as e:
+#             log.warning(e)
+#         self.mark_complete()
 
 
 class Find_All_Files_For_Hour(TaskTemplate):
@@ -221,13 +221,13 @@ class Find_All_Files_For_Hour(TaskTemplate):
             else:
                 log.info(f"creating task - {file[0]} {file[1]['length']}")
                 task_list.append(
-                    DeleteLocalFileRequest(env_config=self.env_config,
-                                           year=self.year,
-                                           month=self.month,
-                                           day=self.day,
-                                           hour=self.hour,
-                                           filename=file[0]
-                                           )
+                    DownloadOneFileFromHDFSRequest(env_config=self.env_config,
+                                                   year=self.year,
+                                                   month=self.month,
+                                                   day=self.day,
+                                                   hour=self.hour,
+                                                   filename=file[0]
+                                                   )
                 )
 
         return task_list
@@ -250,7 +250,7 @@ if __name__ == '__main__':
             filename=''
         )
     ],
-        workers=10,
+        workers=2,
         local_scheduler=True,
         detailed_summary=False
     )
