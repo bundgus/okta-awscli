@@ -15,8 +15,9 @@ job_uuid = hex(uuid.uuid1().int >> 96)[2:]
 formatter = logging.Formatter('<LOGMSGSTART>' +
                               '%(asctime)s - ' + job_uuid +
                               ' - %(levelname)s - %(filename)s - %(lineno)s - %(message)s')
+pid = os.getpid()
 dirname = os.path.dirname(__file__)
-filename = os.path.join(dirname, 'logs/process_pipeline.log')
+filename = os.path.join(dirname, f'logs/{pid}_process_pipeline.log')
 fh = RotatingFileHandler(filename, maxBytes=1000000, backupCount=10)
 fh.setFormatter(formatter)
 log.addHandler(fh)
@@ -59,14 +60,19 @@ class TaskTemplate(luigi.Task):
     def get_hdfs_client(self):
         return InsecureClient(self.env_config['hdfs_server'], user=self.env_config['hdfs_user'])
 
+    def get_token_path(self):
+        token_path = (self.env_config['s3_luigi_status_location']
+                      + self.task_family + '/'
+                      + self.year + '_'
+                      + self.month + '_'
+                      + self.day + '_'
+                      + self.hour + '_'
+                      + self.filename)
+        return token_path
+
     def complete(self):
         if not self.iscomplete:
-            token_path = (self.env_config['s3_luigi_status_location']
-                          + self.task_family + '/'
-                          + self.year + '_'
-                          + self.month + '_'
-                          + self.day + '_'
-                          + self.filename)
+            token_path = self.get_token_path()
             log.info('checking to see if task is complete ' + token_path)
 
             if self.get_s3fs().exists(token_path):
@@ -80,12 +86,7 @@ class TaskTemplate(luigi.Task):
             return True
 
     def mark_complete(self):
-        token_path = (self.env_config['s3_luigi_status_location']
-                      + self.task_family + '/'
-                      + self.year + '_'
-                      + self.month + '_'
-                      + self.day + '_'
-                      + self.filename)
+        token_path = self.get_token_path()
         log.info('marking task as complete ' + token_path)
         self.get_s3fs().touch(token_path)
         self.iscomplete = True
@@ -93,22 +94,24 @@ class TaskTemplate(luigi.Task):
 
 class MaxLocalFiles(luigi.ExternalTask):
     def complete(self):
+        max_local_files = 10
         f = []
         for (dirpath, dirnames, filenames) in walk('data'):
             f.extend(filenames)
 
-        if len(f) >= 10:
-            log.info('10 or more downloaded files found')
+        if len(f) >= max_local_files:
+            log.info(f'{max_local_files} or more downloaded files found')
             return False
         else:
-            log.info('less than 10 downloaded files found')
+            log.info(f'less than {max_local_files} downloaded files found')
             return True
 
 
-class DownloadOneFileFromHDFS(TaskTemplate):
+class DownloadOneFileFromHDFSRequest(TaskTemplate):
+    resources = {'hdfs': 1}
 
-    def requires(self):
-        return MaxLocalFiles()
+    # def requires(self):
+    #     return MaxLocalFiles()
 
     @log_timer
     def run(self):
@@ -124,25 +127,37 @@ class DownloadOneFileFromHDFS(TaskTemplate):
         self.mark_complete()
 
 
-class UploadOneFiletoS3(TaskTemplate):
+class UploadOneFiletoS3Request(TaskTemplate):
+    resources = {'s3': 1}
 
-    def requires(self):
-        return DownloadOneFileFromHDFS(env_config=self.env_config,
-                                       year=self.year,
-                                       month=self.month,
-                                       day=self.day,
-                                       hour=self.hour,
-                                       filename=self.filename
-                                       )
-
-    @log_timer
-    def run(self):
-        local_directory = 'data'
+    def get_s3_file_path(self):
         s3_file_path = self.env_config['s3_response_file_path'].format(self.year,
                                                                        self.month,
                                                                        self.day,
                                                                        self.hour,
                                                                        self.filename)
+        return s3_file_path
+
+    def requires(self):
+        s3_file_path = self.get_s3_file_path()
+        log.info(f'checking for existing file on s3: {s3_file_path}')
+        s3 = self.get_s3fs()
+        if not s3.exists(s3_file_path):
+            return DownloadOneFileFromHDFSRequest(env_config=self.env_config,
+                                                  year=self.year,
+                                                  month=self.month,
+                                                  day=self.day,
+                                                  hour=self.hour,
+                                                  filename=self.filename
+                                                  )
+        else:
+            log.warning(f'file already exists on s3 - skipping download for {s3_file_path}')
+            return None
+
+    @log_timer
+    def run(self):
+        local_directory = 'data'
+        s3_file_path = self.get_s3_file_path()
         log.info(f'uploading file to s3: {s3_file_path}')
         s3 = self.get_s3fs()
         if not s3.exists(s3_file_path):
@@ -152,16 +167,16 @@ class UploadOneFiletoS3(TaskTemplate):
         self.mark_complete()
 
 
-class DeleteLocalFile(TaskTemplate):
+class DeleteLocalFileRequest(TaskTemplate):
 
     def requires(self):
-        return UploadOneFiletoS3(env_config=self.env_config,
-                                 year=self.year,
-                                 month=self.month,
-                                 day=self.day,
-                                 hour=self.hour,
-                                 filename=self.filename,
-                                 )
+        return UploadOneFiletoS3Request(env_config=self.env_config,
+                                        year=self.year,
+                                        month=self.month,
+                                        day=self.day,
+                                        hour=self.hour,
+                                        filename=self.filename,
+                                        )
 
     def run(self):
         local_file_path = os.path.join('data', self.filename)
@@ -180,25 +195,40 @@ class Find_All_Files_For_Hour(TaskTemplate):
 
     def requires(self):
         log.info(f'looking for files on HDFS {self.year} {self.month} {self.day} {self.hour}')
-        client = InsecureClient(self.env_config['hdfs_server'], user=self.env_config['hdfs_user'])
+        client = self.get_hdfs_client()
         hdfs_directory = self.env_config['hdfs_response_file_path'].format(self.year,
                                                                            self.month,
                                                                            self.day,
                                                                            self.hour,
                                                                            '')
-        file_list = client.list(hdfs_directory)
+        hdfs_file_list = client.list(hdfs_directory, status=True)
+        s3 = self.get_s3fs()
+        s3_directory = self.env_config['s3_response_file_path'].format(self.year,
+                                                                       self.month,
+                                                                       self.day,
+                                                                       self.hour,
+                                                                       '')
+        s3_file_list = s3.listdir(s3_directory)
+
+        s3_file_sizes = {}
+        for s3_file in s3_file_list:
+            s3_file_sizes[s3_file['Key'].split('/')[-1]] = s3_file['Size']
+
         task_list = []
-        for file in file_list:
-            log.info(f'found file: {file}')
-            task_list.append(
-                DeleteLocalFile(env_config=self.env_config,
-                                year=self.year,
-                                month=self.month,
-                                day=self.day,
-                                hour=self.hour,
-                                filename=file
-                                )
-            )
+        for file in hdfs_file_list:
+            if file[0] in s3_file_sizes and file[1]['length'] == s3_file_sizes[file[0]]:
+                log.info(f"skipping task creation - found existing file on S3 {file[0]} {file[1]['length']}")
+            else:
+                log.info(f"creating task - {file[0]} {file[1]['length']}")
+                task_list.append(
+                    DeleteLocalFileRequest(env_config=self.env_config,
+                                           year=self.year,
+                                           month=self.month,
+                                           day=self.day,
+                                           hour=self.hour,
+                                           filename=file[0]
+                                           )
+                )
 
         return task_list
 
@@ -220,7 +250,7 @@ if __name__ == '__main__':
             filename=''
         )
     ],
-        workers=4,
+        workers=10,
         local_scheduler=True,
         detailed_summary=False
     )
