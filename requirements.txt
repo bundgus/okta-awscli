@@ -7,3 +7,4 @@ ConfigParser
 hdfs # no conda package, must use pip
 luigi
 s3fs
+watchtower
