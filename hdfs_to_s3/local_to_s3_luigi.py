@@ -293,7 +293,7 @@ if __name__ == '__main__':
             job_uuid=job_uuid
         )
     ],
-        workers=2,
+        workers=3,
         local_scheduler=False,
         # scheduler_host='127.0.0.1',
         detailed_summary=False
